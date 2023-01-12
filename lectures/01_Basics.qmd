@@ -32,7 +32,7 @@ install.packages("dplyr")
 install.packages("ggplot2")
 install.packages("tidyverse")
 install.packages("devtools")
-devtools::install_github("rstudio-education/dsbox")
+devtools::install_github("rstudio-education/dsbox") 
 ```
 
 Once they're installed, load them.
