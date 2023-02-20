@@ -25,6 +25,7 @@
 # - bootGLM: Bootstrap confidence intervals for a GLM
 # - mleGLM: obtain MLE under a GLM
 # - bootCI: Extract confidence intervals from object returned by "boot"
+# - bootstrapAnova: BOOTSTRAP PARAMETRIC TEST FOR NESTED RANDOM EFFECTS MODELS
 
 # LOSS FUNCTIONS FOR CROSS-VALIDATION
 # - cost_loglik_logistic: logistic regression log-likelihood loss
@@ -126,34 +127,23 @@ flogregvec= function(beta, y, ytX, n, X=X, logscale=TRUE) {
 }
 
 #Negative logistic regression log-likelihood
-flogreg= function(beta, y, X, ytX, logscale=TRUE) {
-  if (missing(ytX)) ytX = matrix(y,nrow=1) %*% X
-  if (any(beta != 0)) {
-    Xbeta= as.vector(X %*% matrix(beta,ncol=1))
-    ans= -sum(ytX * beta) + sum(log(1+exp(Xbeta)))
-  } else {
-    n= length(y)
-    ans= n * log(2)
-  }
+flogreg= function(beta, y, X, logscale=TRUE) {
+  ytX = matrix(y,nrow=1) %*% X
+  Xbeta= as.vector(X %*% matrix(beta,ncol=1))
+  ans= -sum(ytX * beta) + sum(log(1+exp(Xbeta)))
   if (!logscale) ans= exp(ans)
   return(ans)
 }
 
 
+
 #Gradient and Hessian of negative logistic regression log-likelihood
-# If beta==0, only ytX, colSumX, XtX are used
-# If beta!=0, only Xbeta and X are used
-fplogreg= function(beta, y, ytX, Xbeta, X, colsumX, XtX) {
-  if (missing(ytX)) ytX = matrix(y,nrow=1) %*% X
-  if (any(beta != 0)) {
-    if (missing(Xbeta)) Xbeta= as.vector(X %*% beta)
-    prob= 1.0/(1.0+exp(-Xbeta))
-    g= -ytX + colSums(X * prob)
-    H= t(X) %*% (prob*(1-prob) * X)
-  } else {
-    g= -ytX + 0.5 * colsumX
-    H= 0.25 * XtX
-  }
+fplogreg= function(beta, y, X) {
+  ytX = matrix(y,nrow=1) %*% X
+  Xbeta= as.vector(X %*% beta)
+  prob= expit(-Xbeta)
+  g= -ytX + colSums(X * prob)
+  H= t(X) %*% (prob*(1-prob) * X)
   return(list(g=g,H=H))
 }
 
@@ -248,6 +238,32 @@ bootCI= function(fit, bootfit, level=0.95) {
   return(bhat.boot)
 }
 
+
+# BOOTSTRAP PARAMETRIC TEST FOR NESTED RANDOM EFFECTS MODELS
+# Input
+# - modelA: larger model, fitted by lmer
+# - model0: null model, i.e. maller model nested within modelA, fitted by lmer
+# - B: number of boostrap samples
+# Output: likelihood ratio test, with Bootstrap-based P-value
+# NOTE: Adapted from https://github.com/proback/BeyondMLR
+bootstrapAnova = function(modelA, model0, B=1000){
+  require(lme4)
+  oneBootstrap = function(model0, modelA){ #LRT test statistic for 1 simulated dataset
+    d = drop(simulate(model0))             #simulate data under model0
+    m2 = lme4::refit(modelA, newresp=d)    #fit modelA to sim data
+    m1 = lme4::refit(model0, newresp=d)    #fit model0 to sim data
+    return(anova(m2,m1)$Chisq[2])          #LRT test statistic
+  }  
+  suppressMessages( nulldist <- replicate(B, oneBootstrap(model0, modelA)) )
+  ret = anova(modelA, model0)
+  ret$"Pr(>Chisq)"[2] = mean(nulldist > ret$Chisq[2])
+  names(ret)[8] = "Pr_boot(>Chisq)"
+  attr(ret, "heading") = c(attr(ret, "heading")[1], 
+                            paste("Parametric bootstrap with", B,"samples."),
+                            attr(ret, "heading")[-1])
+  attr(ret, "nulldist") = nulldist
+  return(ret)
+}
 
 
 ###########################################################################################
