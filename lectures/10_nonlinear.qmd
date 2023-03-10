@@ -45,7 +45,7 @@ In some applications it can be critical to capture non-linear effects. We alread
 
 - Discretize $x_{ij}$ into several groups
 
-More refined strategies
+More refined strategies (e.g. used by `ggplot`)
 
 - Additive regression
 
@@ -54,6 +54,8 @@ More refined strategies
 - Regression trees / random forests
 
 - ...
+
+
 
 
 # Generalized additive models
@@ -105,7 +107,7 @@ legend('topright',c("Truth","Estimated"),lty=1,col=c("blue","black"))
 
 ## Additive models via basis functions
 
-Idea: transform $x_{ij} \in \mathbb{R}^p$ into vector ${\bf w}_j(x_{ij}) \in \mathbb{R}^L$. Let
+Idea: transform $x_{ij} \in \mathbb{R}$ into vector $w_j(x_{ij}) \in \mathbb{R}^L$. Let
  
 $$
 \sum_{j=1}^p f_j(x_{ij})= \sum_{j=1}^p w_j(x_{ij})^T \beta_j
@@ -155,13 +157,13 @@ Since $\sum_{j=1}^p f_j(x_{ij})= \sum_{j=1}^p w_j(x_{ij})^T \beta_j$, we can wri
 $$
 y= W \beta + \epsilon
 $$
-where $y, \epsilon \in \mathbb{R}$, $W$ contains all the $w_j(x_{ij})$'s and $\beta^T= (\beta_1^T,\ldots,\beta_p^T) \in \mathbb{R}^{pL}$ 
+where $y, \epsilon \in \mathbb{R}^n$, $W$ contains all the $w_j(x_{ij})$'s and $\beta^T= (\beta_1^T,\ldots,\beta_p^T) \in \mathbb{R}^{pL}$ 
 
 A standard linear regression model!
 
 - In principle, we could use least-squares
 
-- Since $LP$ is large, use generalized cross-validation to avoid over-fitting
+- Many parameters ($pL$), use generalized cross-validation to avoid over-fitting
 
 GCV is a computationally faster alternative to cross-validation
 
@@ -259,12 +261,12 @@ text(1,1.2,"Output", cex=1.25)
 Value of node $k$ in layer $j$: linear combination of incoming nodes from layer $j-1$, apply an *activation function*
 
 Let $x^{(0)}$ be the input covariates. For layer $k$, nodes $j=1,\ldots,N_k$ are
-$$ x_j^{(k)}= g\left( w_{kj0} + w_{kj}^T x^{(k-1)} \right)$$
+$$ x_j^{(k)}= g\left( \beta_{kj0} + \beta_{kj}^T x^{(k-1)} \right)$$
 
 Popular activation functions $g()$: ReLu, softmax, sigmoid
 
 Last layer $K+1$ has 1 node: the outcome
-$\hat{y}= w_{K+1, 0} + w^T_{K+1} x^{(K)}$
+$\hat{y}= \beta_{K+1, 0} + w^T_{K+1} x^{(K)}$
 
 Finally, specify loss function: least-squares, logistic regression log-likelihood
 
@@ -303,7 +305,7 @@ Convert to numeric, standardize covariates to mean 0 & variance 1 (important!), 
 
 ```{r}
 data("BreastCancer")  #package mlbench
-BreastCancer = BreastCancer[which(complete.cases(BreastCancer)==TRUE),]
+BreastCancer = BreastCancer[which(complete.cases(BreastCancer)==TRUE),] #exclude cases with missing values
 BreastCancer = mutate(BreastCancer, Class= ifelse(Class=='malignant',1,0)) |>
   mutate_if(is.factor, as.numeric) |> #convert factors to numeric
   select(-Id)  #drop Id column
@@ -312,7 +314,7 @@ covars= names(select(BreastCancer, -Class))
 BreastCancer= mutate_at(BreastCancer, covars, scale) #standardize to mean 0, variance 1
 
 n= nrow(BreastCancer)
-sel= sample(1:n, size=round(0.8*n), replace=FALSE)
+sel= sample(1:n, size=round(0.8*n), replace=FALSE)  #80% of data in training set, 20% in test set
 train= BreastCancer[sel,]
 test= BreastCancer[-sel,]
 
